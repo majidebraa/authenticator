@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:authenticator/totp_timer_indicator.dart';
 import 'package:flutter/material.dart';
+import 'import_export_screen.dart';
 import 'manual_otp_dialog.dart';
 import 'qr_scanner_screen.dart';
 import 'secure_token_storage.dart';
@@ -79,10 +80,27 @@ class _TokenListScreenState extends State<TokenListScreen> {
     );
   }
 
+  void _openImportExportScreen() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ImportExportScreen(tokens: _tokens, storage: _storage),
+      ),
+    ).then((_) => setState(() {}));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Authenticator')),
+      appBar: AppBar(
+        title: const Text('Authenticator'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.import_export),
+            onPressed: _openImportExportScreen,
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
     child: const Icon(Icons.add),
     onPressed: () => _showAddOptions(context),
