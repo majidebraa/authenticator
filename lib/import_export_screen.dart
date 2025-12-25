@@ -113,6 +113,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
       body: ListView(
         children: [
           Card(
+            elevation: 0,
             margin: const EdgeInsets.all(12),
             child: ListTile(
               leading: const Icon(Icons.copy),
@@ -122,6 +123,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
             ),
           ),
           Card(
+            elevation: 0,
             margin: const EdgeInsets.all(12),
             child: ListTile(
               leading: const Icon(Icons.paste),
@@ -131,6 +133,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
             ),
           ),
           Card(
+            elevation: 0,
             margin: const EdgeInsets.all(12),
             child: ListTile(
               leading: const Icon(Icons.save),
@@ -140,6 +143,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
             ),
           ),
           Card(
+            elevation: 0,
             margin: const EdgeInsets.all(12),
             child: ListTile(
               leading: const Icon(Icons.folder_open),
