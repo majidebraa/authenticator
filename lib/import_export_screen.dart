@@ -1,27 +1,30 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
-import 'secure_token_storage.dart';
-import 'token_model.dart';
 import 'package:share_plus/share_plus.dart';
 
+import 'secure_token_storage.dart';
+import 'token_model.dart';
 
 class ImportExportScreen extends StatefulWidget {
   final List<TokenModel> tokens;
   final SecureTokenStorage storage;
 
-  const ImportExportScreen({super.key, required this.tokens, required this.storage});
+  const ImportExportScreen({
+    super.key,
+    required this.tokens,
+    required this.storage,
+  });
 
   @override
   State<ImportExportScreen> createState() => _ImportExportScreenState();
 }
 
 class _ImportExportScreenState extends State<ImportExportScreen> {
-
   @override
   void initState() {
     super.initState();
@@ -30,26 +33,36 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
   Future<void> _exportToClipboard() async {
     final jsonStr = jsonEncode(widget.tokens.map((t) => t.toJson()).toList());
     await Clipboard.setData(ClipboardData(text: jsonStr));
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('Copied to clipboard')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Copied to clipboard')));
   }
 
   void _importFromClipboard(BuildContext context) async {
     final data = await Clipboard.getData('text/plain');
     if (data != null && data.text != null) {
-      final decoded = jsonDecode(data.text!);
-      for (var item in decoded) {
-        final token = TokenModel.fromJson(item);
-        if (!widget.tokens.any((t) =>
-        t.secret == token.secret &&
-            t.issuer == token.issuer &&
-            t.account == token.account)) {
-          widget.tokens.add(token);
+      try {
+        final decoded = jsonDecode(data.text!);
+        for (var item in decoded) {
+          final token = TokenModel.fromJson(item);
+          if (!widget.tokens.any(
+            (t) =>
+                t.secret == token.secret &&
+                t.issuer == token.issuer &&
+                t.account == token.account,
+          )) {
+            widget.tokens.add(token);
+          }
         }
+        await widget.storage.save(widget.tokens);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Import from clipboard completed')),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Invalid clipboard content')),
+        );
       }
-      await widget.storage.save(widget.tokens);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Import from clipboard completed')));
     }
   }
 
@@ -73,11 +86,13 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
 
       await SharePlus.instance.share(params);
 
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Exported successfully')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Exported successfully')));
     } catch (e) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
     }
   }
 
@@ -94,14 +109,18 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
         final List<dynamic> list = jsonDecode(content);
         final imported = list.map((e) => TokenModel.fromJson(e)).toList();
         setState(() {
-          widget.tokens.addAll(imported.where((t) => !widget.tokens.contains(t)));
+          widget.tokens.addAll(
+            imported.where((t) => !widget.tokens.contains(t)),
+          );
         });
         await widget.storage.save(widget.tokens);
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Imported from file')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Imported from file')));
       } catch (e) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Invalid file')));
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Invalid file')));
       }
     }
   }
@@ -129,7 +148,7 @@ class _ImportExportScreenState extends State<ImportExportScreen> {
               leading: const Icon(Icons.paste),
               title: const Text('Import from Clipboard'),
               subtitle: const Text('Paste OTP JSON from clipboard'),
-              onTap: () =>_importFromClipboard(context),
+              onTap: () => _importFromClipboard(context),
             ),
           ),
           Card(
