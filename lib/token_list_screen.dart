@@ -200,69 +200,6 @@ class _TokenListScreenState extends State<TokenListScreen> {
     );
   }
 
-  void _showManualOtpBottomSheet(BuildContext context) {
-    final issuerCtrl = TextEditingController();
-    final accountCtrl = TextEditingController();
-    final secretCtrl = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (_) => Padding(
-        padding: EdgeInsets.only(
-          left: 16,
-          right: 16,
-          top: 16,
-          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-              'Add OTP manually',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 12),
-
-            TextField(
-              controller: issuerCtrl,
-              decoration: const InputDecoration(labelText: 'Issuer'),
-            ),
-            TextField(
-              controller: accountCtrl,
-              decoration: const InputDecoration(labelText: 'Account'),
-            ),
-            TextField(
-              controller: secretCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Setup key (Base32)',
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            ElevatedButton(
-              onPressed: () {
-                final token = TokenModel(
-                  issuer: issuerCtrl.text.trim(),
-                  account: accountCtrl.text.trim(),
-                  secret: secretCtrl.text
-                      .replaceAll(' ', '')
-                      .toUpperCase(),
-                );
-                Navigator.pop(context);
-                _addToken(token);
-              },
-              child: const Text('Add'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
 
 }
