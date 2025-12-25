@@ -11,6 +11,7 @@ import 'totp.dart';
 import 'edit_otp_dialog.dart';
 
 class TokenListScreen extends StatefulWidget {
+
   const TokenListScreen({super.key});
 
   @override

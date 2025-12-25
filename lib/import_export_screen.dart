@@ -1,72 +1,108 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:authenticator/secure_token_storage.dart';
-import 'package:authenticator/token_model.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'secure_token_storage.dart';
+import 'token_model.dart';
+import 'package:share_plus/share_plus.dart';
 
-class ImportExportScreen extends StatelessWidget {
+
+class ImportExportScreen extends StatefulWidget {
   final List<TokenModel> tokens;
   final SecureTokenStorage storage;
 
   const ImportExportScreen({super.key, required this.tokens, required this.storage});
 
-  Future<void> _exportToFile(BuildContext context) async {
-    final jsonStr = jsonEncode(tokens.map((t) => t.toJson()).toList());
-    final dir = await getApplicationDocumentsDirectory();
-    final file = File('${dir.path}/otps_export.json');
-    await file.writeAsString(jsonStr);
-    ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Exported to ${file.path}')));
+  @override
+  State<ImportExportScreen> createState() => _ImportExportScreenState();
+}
+
+class _ImportExportScreenState extends State<ImportExportScreen> {
+
+  @override
+  void initState() {
+    super.initState();
   }
 
-  Future<void> _importFromFile(BuildContext context) async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.any);
-    if (result != null && result.files.single.path != null) {
-      final file = File(result.files.single.path!);
-      final jsonStr = await file.readAsString();
-      final List decoded = jsonDecode(jsonStr);
-      for (var item in decoded) {
-        final token = TokenModel.fromJson(item);
-        if (!tokens.any((t) =>
-        t.secret == token.secret &&
-            t.issuer == token.issuer &&
-            t.account == token.account)) {
-          tokens.add(token);
-        }
-      }
-      await storage.save(tokens);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Import completed')));
-    }
-  }
-
-  Future<void> _exportToClipboard(BuildContext context) async {
-    final jsonStr = jsonEncode(tokens.map((t) => t.toJson()).toList());
+  Future<void> _exportToClipboard() async {
+    final jsonStr = jsonEncode(widget.tokens.map((t) => t.toJson()).toList());
     await Clipboard.setData(ClipboardData(text: jsonStr));
     ScaffoldMessenger.of(context)
         .showSnackBar(const SnackBar(content: Text('Copied to clipboard')));
   }
 
-  Future<void> _importFromClipboard(BuildContext context) async {
+  void _importFromClipboard(BuildContext context) async {
     final data = await Clipboard.getData('text/plain');
     if (data != null && data.text != null) {
       final decoded = jsonDecode(data.text!);
       for (var item in decoded) {
         final token = TokenModel.fromJson(item);
-        if (!tokens.any((t) =>
+        if (!widget.tokens.any((t) =>
         t.secret == token.secret &&
             t.issuer == token.issuer &&
             t.account == token.account)) {
-          tokens.add(token);
+          widget.tokens.add(token);
         }
       }
-      await storage.save(tokens);
+      await widget.storage.save(widget.tokens);
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('Import from clipboard completed')));
+    }
+  }
+
+  Future<void> _exportToFile() async {
+    try {
+      final jsonStr = jsonEncode(widget.tokens.map((t) => t.toJson()).toList());
+
+      // Get a directory to save file
+      final directory = await getApplicationDocumentsDirectory();
+      final file = File('${directory.path}/otp_backup.json');
+
+      // Write JSON
+      await file.writeAsString(jsonStr);
+
+      // Share the file using ShareParams
+      final params = ShareParams(
+        files: [XFile(file.path)],
+        fileNameOverrides: ['otp_backup.json'], // optional: override filename
+        text: 'OTP Backup',
+      );
+
+      await SharePlus.instance.share(params);
+
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Exported successfully')));
+    } catch (e) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Export failed: $e')));
+    }
+  }
+
+  Future<void> _importFromFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      dialogTitle: 'Select OTP backup',
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+    if (result != null && result.files.single.path != null) {
+      final file = File(result.files.single.path!);
+      final content = await file.readAsString();
+      try {
+        final List<dynamic> list = jsonDecode(content);
+        final imported = list.map((e) => TokenModel.fromJson(e)).toList();
+        setState(() {
+          widget.tokens.addAll(imported.where((t) => !widget.tokens.contains(t)));
+        });
+        await widget.storage.save(widget.tokens);
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Imported from file')));
+      } catch (e) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('Invalid file')));
+      }
     }
   }
 
@@ -74,32 +110,45 @@ class ImportExportScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Import / Export OTPs')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            ElevatedButton.icon(
-              icon: const Icon(Icons.upload_file),
-              label: const Text('Export to File'),
-              onPressed: () => _exportToFile(context),
+      body: ListView(
+        children: [
+          Card(
+            margin: const EdgeInsets.all(12),
+            child: ListTile(
+              leading: const Icon(Icons.copy),
+              title: const Text('Export to Clipboard'),
+              subtitle: const Text('Copy all OTPs as JSON to clipboard'),
+              onTap: _exportToClipboard,
             ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.download),
-              label: const Text('Import from File'),
-              onPressed: () => _importFromFile(context),
+          ),
+          Card(
+            margin: const EdgeInsets.all(12),
+            child: ListTile(
+              leading: const Icon(Icons.paste),
+              title: const Text('Import from Clipboard'),
+              subtitle: const Text('Paste OTP JSON from clipboard'),
+              onTap: () =>_importFromClipboard(context),
             ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.copy),
-              label: const Text('Export to Clipboard'),
-              onPressed: () => _exportToClipboard(context),
+          ),
+          Card(
+            margin: const EdgeInsets.all(12),
+            child: ListTile(
+              leading: const Icon(Icons.save),
+              title: const Text('Export to File'),
+              subtitle: const Text('Save OTP backup as a JSON file'),
+              onTap: _exportToFile,
             ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.paste),
-              label: const Text('Import from Clipboard'),
-              onPressed: () => _importFromClipboard(context),
+          ),
+          Card(
+            margin: const EdgeInsets.all(12),
+            child: ListTile(
+              leading: const Icon(Icons.folder_open),
+              title: const Text('Import from File'),
+              subtitle: const Text('Load OTPs from a JSON backup file'),
+              onTap: _importFromFile,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
