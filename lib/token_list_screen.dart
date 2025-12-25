@@ -2,16 +2,17 @@ import 'dart:async';
 
 import 'package:authenticator/totp_timer_indicator.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import 'edit_otp_dialog.dart';
 import 'import_export_screen.dart';
 import 'manual_otp_dialog.dart';
 import 'qr_scanner_screen.dart';
 import 'secure_token_storage.dart';
 import 'token_model.dart';
 import 'totp.dart';
-import 'edit_otp_dialog.dart';
 
 class TokenListScreen extends StatefulWidget {
-
   const TokenListScreen({super.key});
 
   @override
@@ -44,24 +45,26 @@ class _TokenListScreenState extends State<TokenListScreen> {
   }
 
   bool _exists(TokenModel token) {
-    return _tokens.any((t) =>
-    t.secret == token.secret &&
-        t.issuer == token.issuer &&
-        t.account == token.account);
+    return _tokens.any(
+      (t) =>
+          t.secret == token.secret &&
+          t.issuer == token.issuer &&
+          t.account == token.account,
+    );
   }
 
   Future<void> _addToken(TokenModel token) async {
     if (_exists(token)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('OTP already exists')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('OTP already exists')));
       return;
     }
     setState(() => _tokens.add(token));
     await _storage.save(_tokens);
   }
 
-  Future<bool?> _confirmDelete(BuildContext context) {
+  Future<bool?> _confirmDelete() {
     return showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -90,6 +93,13 @@ class _TokenListScreenState extends State<TokenListScreen> {
     ).then((_) => setState(() {}));
   }
 
+  void _copyCode(String code) {
+    Clipboard.setData(ClipboardData(text: code));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('OTP copied')));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -103,9 +113,9 @@ class _TokenListScreenState extends State<TokenListScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-    child: const Icon(Icons.add),
-    onPressed: () => _showAddOptions(context),
-    ),
+        onPressed: () => _showAddOptions(context),
+        child: const Icon(Icons.add),
+      ),
       body: ListView.builder(
         itemCount: _tokens.length,
         itemBuilder: (context, index) {
@@ -119,23 +129,52 @@ class _TokenListScreenState extends State<TokenListScreen> {
 
           return Dismissible(
             key: ValueKey('${token.secret}-${token.account}'),
+            direction: DismissDirection.horizontal,
 
-            direction: DismissDirection.endToStart,
+            /// CONFIRM BASED ON DIRECTION
+            confirmDismiss: (direction) async {
+              if (direction == DismissDirection.startToEnd) {
+                // EDIT
+                final updated = await showDialog<TokenModel>(
+                  context: context,
+                  builder: (_) => EditOtpDialog(token: token),
+                );
+                if (updated != null) {
+                  setState(() {
+                    final i = _tokens.indexOf(token);
+                    if (i != -1) _tokens[i] = updated;
+                  });
+                  await _storage.save(_tokens);
+                }
+                return false; // do NOT dismiss
+              }
 
-            confirmDismiss: (_) => _confirmDelete(context),
+              // DELETE
+              return await _confirmDelete();
+            },
 
-            /// ✅ REMOVE BY IDENTITY — NOT INDEX
             onDismissed: (_) async {
               setState(() {
-                _tokens.removeWhere((t) =>
-                t.secret == token.secret &&
-                    t.account == token.account &&
-                    t.issuer == token.issuer);
+                _tokens.removeWhere(
+                  (t) =>
+                      t.secret == token.secret &&
+                      t.account == token.account &&
+                      t.issuer == token.issuer,
+                );
               });
               await _storage.save(_tokens);
             },
 
+            /// LEFT → RIGHT (EDIT)
             background: Container(
+              color: Colors.blue,
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.only(left: 20),
+              child: const Icon(Icons.edit, color: Colors.white),
+            ),
+
+            /// RIGHT → LEFT (DELETE)
+            secondaryBackground: Container(
               color: Colors.red,
               alignment: Alignment.centerRight,
               padding: const EdgeInsets.only(right: 20),
@@ -144,28 +183,19 @@ class _TokenListScreenState extends State<TokenListScreen> {
 
             child: Card(
               elevation: 0,
-              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               child: ListTile(
-                onTap: () async {
-                  final updated = await showDialog<TokenModel>(
-                    context: context,
-                    builder: (_) => EditOtpDialog(token: token),
-                  );
-                  if (updated != null) {
-                    setState(() {
-                      final i = _tokens.indexOf(token);
-                      if (i != -1) _tokens[i] = updated;
-                    });
-                    await _storage.save(_tokens);
-                  }
-                },
                 title: Text('${token.issuer} (${token.account})'),
-                subtitle: Text(
-                  code,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
+                subtitle: GestureDetector(
+                  onTap: () => _copyCode(code),
+                  onLongPress: () => _copyCode(code),
+                  child: Text(
+                    code,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 2,
+                    ),
                   ),
                 ),
                 trailing: TotpTimerIndicator(period: token.period),
@@ -218,7 +248,4 @@ class _TokenListScreenState extends State<TokenListScreen> {
       },
     );
   }
-
-
-
 }
